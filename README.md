@@ -11,6 +11,8 @@ How to use the bot:
 The bot has the following features:
 - Can give a random BUG mafia quote - from bug_mafia.txt
 - tracks chat and time statistics per user - saves them in stats.txt
+- creates a session log in - log.txt
+- all commands can be seen using /help
 
 TODO:
 - remember/forget/getlink - to save/recall links in conversation
