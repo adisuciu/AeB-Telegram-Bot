@@ -58,5 +58,6 @@ target/
 
 
 # AeBBot stuff:
+.idea/
 stats.txt
 log.txt
