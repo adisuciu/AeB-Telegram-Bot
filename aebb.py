@@ -8,13 +8,10 @@ import random
 import os
 import settings
 
-
 # TODO:
 # - save stats only if new messages detected (in case privacy is set off) - is it worth it ?
-# - fix logging - to track relevant information
 # - get gentlemanboners
 # - remember/forget/getlink
-# - upload to github
 
 start_time = time.time()
 with open("log.txt", mode='w') as f:  # delete previous log file - TODO: rename log file ?
@@ -34,7 +31,11 @@ def log(message):
     with open("log.txt", mode='a') as file:
         file.write(string+'\n')
 
-log("AeB - Bot - v0.1 - Adrian Suciu")
+
+def log_exception(message):
+    log("EXCEPTION! - "+str(message))
+
+log("AeB - Bot - v0.1 - https://github.com/adisuciu/AeB-Telegram-Bot")
 log("initializing ...")
 
 botQueryURL = settings.botQueryURL
@@ -119,9 +120,23 @@ def get_update():
     pass
 
 
+def send_http_query(query):
+    result_qry = ""
+    try:
+        result_qry = urllib.request.urlopen(query).read()
+    except:  # urllib.error.HTTPError:
+        log_exception("request query - " + query)
+        if result_qry:
+            log_exception("response query - " + str(result_qry))
+        else:
+            log_exception("no response query")
+        log_exception(str(sys.exc_info()))
+    return result_qry
+
+
 def send_message(message):
-    qry = urllib.request.urlopen(build_sendmessage_url(message)).read()
-    log(qry)
+    http_qry = build_sendmessage_url(message)
+    send_http_query(http_qry)
 
 
 def build_help():
@@ -214,9 +229,9 @@ def process(update):
             "list_users": list_users,
             "save_stats": save_stats
         }
-        response = switcher[request]() if request in switcher else "command not found"
-        log(request)
-        log(response)
+        response = switcher[request]() if request in switcher else False
+        log("Request - " + str(request))
+        log("Response - " + str(response))
         if response:
             send_message(response)
 
@@ -258,10 +273,10 @@ def save_stats():
     pass
 
 
-log("getMe()")
-query = urllib.request.urlopen(build_getme_url()).read()
+log("getMe() - verifies HTTPS connectivity to Telegram API")
+response_query = send_http_query(build_getme_url())
 log("parsing received JSON")
-jsonData = json.loads(query.decode('utf-8'))
+jsonData = json.loads(response_query.decode('utf-8'))
 
 if not init_bot(jsonData):  # init unsuccessful
     sys.exit(0)  # bot program will now quit
@@ -273,8 +288,8 @@ init_stats()
 
 while not shutdown:
     # getUpdates from server
-    query = urllib.request.urlopen(build_update_url(str(updateID))).read()
-    jsonData = json.loads(query.decode('utf-8'))
+    response_query = send_http_query(build_update_url(str(updateID)))
+    jsonData = json.loads(response_query.decode('utf-8'))
     if jsonData['ok']:
         if jsonData['result']:
             for http_update in jsonData['result']:
