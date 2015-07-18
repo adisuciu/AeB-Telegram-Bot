@@ -9,12 +9,11 @@ import os
 import settings
 
 # TODO:
-# - save stats only if new messages detected (in case privacy is set off) - is it worth it ?
-# - get gentlemanboners
-# - remember/forget/getlink
+# - implement imgur api
+# - break code down in modules
 
 start_time = time.time()
-with open("log.txt", mode='w') as f:  # delete previous log file - TODO: rename log file ?
+with open(settings.log_file, mode='w') as f:  # delete previous file
     pass
 
 
@@ -26,17 +25,19 @@ def get_uptime():
 
 def log(message):
     d = get_uptime()
-    string = ("[%d:%02d:%02d:%02d] - " % (d.day-1, d.hour, d.minute, d.second))+str(message)
+    string = ("[%d:%02d:%02d:%02d] - " % (d.day - 1, d.hour, d.minute, d.second)) + str(message)
     print(string)
-    with open("log.txt", mode='a') as file:
-        file.write(string+'\n')
+    with open(settings.log_file, mode='a') as file:
+        file.write(string + '\n')
 
 
 def log_exception(message):
-    log("EXCEPTION! - "+str(message))
+    log("EXCEPTION! - " + str(message))
+
 
 log("AeB - Bot - v0.1 - https://github.com/adisuciu/AeB-Telegram-Bot")
 log("initializing ...")
+log("%s log file successfully created" % settings.log_file)
 
 botQueryURL = settings.botQueryURL
 updateFrequency = settings.updateFrequency
@@ -45,13 +46,17 @@ updateID = 0
 getMe = "getMe"
 getUpdates = "getUpdates"
 sendMessage = "sendMessage"
+parameters = ""
 urlParserSafeChars = '/:&?=\\'
 botprefix = '/'
 bot_id = 0
 chat_id = 0
+message_id = 0
 no_data_cnt = 0
 save_stats_cnt = 0
 Chats = {}  # dictionary {chat_id : {user_id : UserStat}}
+Links = {}
+nsfw_tag = False
 
 
 class UserStat:
@@ -104,16 +109,21 @@ def init_bot(json_data):
 
 
 def build_update_url(update_id):
-    return urllib.parse.quote_plus(botQueryURL+getUpdates+"?offset="+update_id, urlParserSafeChars)
+    return urllib.parse.quote_plus(botQueryURL + getUpdates + "?offset=" + update_id, urlParserSafeChars)
 
 
 def build_sendmessage_url(message):
-    return urllib.parse.quote_plus(botQueryURL+sendMessage+"?chat_id="+str(chat_id)+'&text='+message,
-                                   urlParserSafeChars)
+    return urllib.parse.quote_plus(botQueryURL + sendMessage
+                                   + "?chat_id=" + str(chat_id)
+                                   + '&text=' + message
+                                   + '&disable_web_page_preview=' + str(nsfw_tag)
+                                   # uncomment next line to enable reply to message
+                                   # + '&reply_to_message_id='+str(message_id)
+                                   , urlParserSafeChars)
 
 
 def build_getme_url():
-    return urllib.parse.quote_plus(botQueryURL+getMe, urlParserSafeChars)
+    return urllib.parse.quote_plus(botQueryURL + getMe, urlParserSafeChars)
 
 
 def get_update():
@@ -122,6 +132,7 @@ def get_update():
 
 def send_http_query(query):
     result_qry = ""
+    # noinspection PyBroadException
     try:
         result_qry = urllib.request.urlopen(query).read()
     except:  # urllib.error.HTTPError:
@@ -135,29 +146,39 @@ def send_http_query(query):
 
 
 def send_message(message):
+    global nsfw_tag
     http_qry = build_sendmessage_url(message)
+    nsfw_tag = False
+    log(http_qry)
     send_http_query(http_qry)
 
 
-def build_help():
+# noinspection PyUnusedLocal
+def build_help(request=0):
     return "/help - this help\n" \
-           "/about - about this bot\n"\
+           "/about - about this bot\n" \
            "/bug_quote - requests random BUG MAFIA quote\n" \
            "/list_users - lists active users of this chat\n" \
-           "/chat_stats - lists statistics for the active users of this chat\n"\
-           "/uptime - shows the uptime of the bot"
+           "/chat_stats - lists statistics for the active users of this chat\n" \
+           "/uptime - shows the uptime of the bot\n"\
+           "/remember <name> <phrase> - maps <phrase> to a <name>. if name contains nsfw, no preview will be shown on recall\n"\
+           "/forget <name> - forgets <name> and attached <phrase>\n"\
+           "/recall <name> [hide/nsfw] - recalls the <phrase> with name <name> - [hide][nsfw] - hides preview\n"\
+           "/search [phrase] - search all names that begin with [phrase]. [phrase] can be empty - lists all names \n"
 
 
-def build_bug_quote():
-    with open(settings.quote_src) as file:
+# noinspection PyUnusedLocal
+def build_bug_quote(request=0):
+    with open(settings.quote_file) as file:
         content = file.readlines()
     file.close()
-    string = content[random.randint(0, len(content)-1)]  # return random string from file
+    string = content[random.randint(0, len(content) - 1)]  # return random string from file
     decoded_string = bytes(string, "utf-8").decode("unicode_escape")  # parse escape sequences such as \n
     return decoded_string
 
 
-def build_stats():
+# noinspection PyUnusedLocal
+def build_stats(request=0):
     string = "Chat activity statistics are:\n"
     if not Chats[chat_id]:
         return "No stats for this chat"
@@ -168,12 +189,13 @@ def build_stats():
         number_of_msg = Chats[chat_id][user].get_msgcount()
         number_of_min = Chats[chat_id][user].get_timecount()
 
-        string += (namestring + " - " + str(number_of_msg) + " messages in " + str(number_of_min) + " minutes ")+"\n"
+        string += (namestring + " - " + str(number_of_msg) + " messages in " + str(number_of_min) + " minutes ") + "\n"
     return string
     pass
 
 
-def list_users():
+# noinspection PyUnusedLocal
+def list_users(request=0):
     string = "This channel's active users are:\n"
     for user, attributes in Chats[chat_id].items():
         username = (Chats[chat_id][user].get_user()[0])
@@ -184,23 +206,111 @@ def list_users():
     return string
 
 
-def build_about():
+# noinspection PyUnusedLocal
+def build_about(request=0):
     return settings.about_message
 
 
-def build_uptime():
+# noinspection PyUnusedLocal
+def build_uptime(request=0):
     d = get_uptime()
-    return "Uptime: %d days, %02d:%02d:%02d " % (d.day-1, d.hour, d.minute, d.second)
+    return "Uptime: %d days, %02d:%02d:%02d " % (d.day - 1, d.hour, d.minute, d.second)
 
 
-def dummy():
+# noinspection PyUnusedLocal
+def dummy(request=0):
     return False
+
+
+def save_links_file():
+    output = json.dumps(Links)
+    with open(settings.links_file, mode="w") as file:
+        file.write(output)
+
+
+def load_links_file():
+    if not os.path.isfile(settings.links_file):
+        log("%s does not exist. No links loaded" % settings.links_file)
+        return  # file does not exist
+
+    with open(settings.links_file) as file:
+        file_content = file.read()
+
+    global Links
+    Links = json.loads(file_content)
+    log("Links dictionary loaded from %s" % settings.links_file)
+
+
+def build_remember_link(request):
+    if type(request) == list and len(request) == 3:
+        if request[1] in Links:
+            return "This name already exists in the database"
+        else:
+            Links[request[1]] = request[2]
+            save_links_file()
+            return "'%s' remembered" % request[1]
+    else:
+        return "Wrong number of parameters. Usage: /remember <name> <link>"
+
+
+def build_forget_link(request):
+    if type(request) == list and len(request) == 2:
+        if request[1] in Links:
+            del Links[request[1]]
+            save_links_file()
+            return "'%s' forgotten" % request[1]
+        else:
+            return "'%s' cannot be found" % request[1]
+    else:
+        return "Wrong number of parameters. Usage: /forget <name>"
+
+
+def find_links_startwith(sw=""):
+    retval = []
+    for link in Links:
+        if str(link).startswith(sw):
+            retval.append(link)
+    return retval
+
+
+# noinspection PyUnusedLocal
+def build_recall_link(request):
+    load_links_file()  # reload just in case - it should already be synced
+    if type(request) == list and len(request) in {2, 3}:
+        global nsfw_tag
+        if {'nsfw', 'hide', 'NSFW'}.intersection(request):  # nsfw/hide parameter
+            nsfw_tag = True
+
+        if 'nsfw' in request[1]:  # link key contains nsfw
+            nsfw_tag = True
+
+        if request[1] in Links:
+            return str(Links[request[1]])
+        else:
+            return "'%s' cannot be found\nDid you mean any of the following: %s" % \
+                   (request[1], "'" + "', '".join(find_links_startwith(request[1])) + "'")
+    else:
+        return "Wrong number of parameters. Usage /recall <name> [nsfw/hide]"
+
+
+# noinspection PyUnusedLocal
+def build_search_link(request):
+    if type(request) == list and len(request) in {1, 2}:
+        load_links_file()
+        string = "Currently remembered links %sare:\n" % \
+                 (("that start with '%s' " % request[1]) if len(request) == 2 else "")
+        string += "'" + "', '".join(find_links_startwith(request[1] if len(request) == 2 else '')) + "'"
+        return string
+    else:
+        return "Wrong number of parameters. Usage /listlink [phrase]"
 
 
 def process(update):
     request = str(update['message']['text']) if 'text' in update['message'] else "$$"
     global chat_id
     chat_id = update['message']['chat']['id']
+    global message_id
+    message_id = update['message']['message_id']
     user_id = update['message']['from']['id']
     username = update['message']['from']['username'] if 'username' in update['message']['from'] else 0
     first_name = update['message']['from']['first_name'] if 'first_name' in update['message']['from'] else 0
@@ -219,6 +329,7 @@ def process(update):
     # process received commands
     if request.startswith(botprefix):
         request = request.split(botprefix, 1)[1]
+        request = request.split()
         switcher = {
             "": dummy,
             "help": build_help,
@@ -227,9 +338,13 @@ def process(update):
             "about": build_about,
             "uptime": build_uptime,
             "list_users": list_users,
-            "save_stats": save_stats
+            "save_stats": save_stats,
+            "remember": build_remember_link,
+            "forget": build_forget_link,
+            "recall": build_recall_link,
+            "search": build_search_link
         }
-        response = switcher[request]() if request in switcher else False
+        response = switcher[request[0]](request) if request[0] in switcher else False
         log("Request - " + str(request))
         log("Response - " + str(response))
         if response:
@@ -237,10 +352,11 @@ def process(update):
 
 
 def init_stats():
-    if not os.path.isfile("stats.txt"):
+    if not os.path.isfile(settings.stats_file):
+        log("%s does not exist. No stats loaded" % settings.stats_file)
         return  # file does not exist
 
-    with open("stats.txt") as file:
+    with open(settings.stats_file) as file:
         file_content = file.read()
 
     if not input:
@@ -262,13 +378,14 @@ def init_stats():
                 Chats[int(chat)][int(user_id)] = UserStat(user, msgcount, timecount, timestamp)
             else:
                 Chats[int(chat)] = {int(user_id): UserStat(user, msgcount, timecount, timestamp)}
+    log("Chat statistics loaded from %s" % settings.stats_file)
 
 
-def save_stats():
+# noinspection PyUnusedLocal
+def save_stats(request=0):
     output = json.dumps(Chats, cls=JSONChatStatEncoder)
-    with open("stats.txt", mode='w') as file:
+    with open(settings.stats_file, mode='w') as file:
         file.write(output)
-    file.close()
     log("Stats saved")
     pass
 
@@ -281,10 +398,12 @@ jsonData = json.loads(response_query.decode('utf-8'))
 if not init_bot(jsonData):  # init unsuccessful
     sys.exit(0)  # bot program will now quit
 
-log("bot initialization successful")
 shutdown = False
 random.seed()  # init random number generator
 init_stats()
+load_links_file()
+log("bot initialization successful")
+log("bot is now listening")
 
 while not shutdown:
     # getUpdates from server
@@ -295,7 +414,7 @@ while not shutdown:
             for http_update in jsonData['result']:
                 # process updates
                 process(http_update)
-                updateID = http_update['update_id']+1
+                updateID = http_update['update_id'] + 1
         else:
             if no_data_cnt < 30:  # every 30 seconds
                 no_data_cnt += 1
