@@ -60,4 +60,4 @@ target/
 # AeBBot stuff:
 .idea/
 *.txt
-!bugmafia.txt
+!bug_mafia.txt
