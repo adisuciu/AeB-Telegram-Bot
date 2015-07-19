@@ -1,1 +1,1 @@
-web: python aebb.py
+worker: python aebb.py
