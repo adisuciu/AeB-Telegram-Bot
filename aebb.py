@@ -359,7 +359,11 @@ def process(update):
     # process received commands
     if request.startswith(botprefix):
         request = request.split(botprefix, 1)[1]
-        request = request.split()
+        if request:
+            request = request.split()
+        else:
+            return
+
         switcher = {
             "": dummy,
             "help": build_help,

@@ -1,5 +1,6 @@
 import datetime
-botQueryURL = "https://api.telegram.org/bot122796814:AAFFzsDhSGGCLOd_o2KDmsJOiSA99Zc944o/"
+botToken = "116918828:AAGPLaxUREwHTkk3Y09J_a0ETX1bYaHTGrs"
+botQueryURL = "https://api.telegram.org/bot%s/" % (botToken)
 imgur_api_client_id = "afc6b8634860754"
 imgflip_username = "AeBBot"
 imgflip_password = "aebbotpassword"
