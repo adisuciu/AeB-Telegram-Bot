@@ -9,7 +9,9 @@ import os
 import settings
 
 # TODO:
-# - implement imgur api
+# - on the fly meme gen
+# - google image search (to replace imgbot)
+# - implement daily stats
 # - break code down in modules
 
 start_time = time.time()
@@ -132,15 +134,19 @@ def get_update():
 
 def send_http_query(query):
     result_qry = ""
+    # review this part
     # noinspection PyBroadException
     try:
         result_qry = urllib.request.urlopen(query).read()
     except:  # urllib.error.HTTPError:
-        log_exception("request query - " + query)
-        if result_qry:
-            log_exception("response query - " + str(result_qry))
+        if type(query) == str:
+            log("request query - " + query)
         else:
-            log_exception("no response query")
+            log(query.full_url)
+        if result_qry:
+            log("response query - " + str(result_qry))
+        else:
+            log("no response")
         log_exception(str(sys.exc_info()))
     return result_qry
 
@@ -164,7 +170,9 @@ def build_help(request=0):
            "/remember <name> <phrase> - maps <phrase> to a <name>. if name contains nsfw, no preview will be shown on recall\n"\
            "/forget <name> - forgets <name> and attached <phrase>\n"\
            "/recall <name> [hide/nsfw] - recalls the <phrase> with name <name> - [hide][nsfw] - hides preview\n"\
-           "/search [phrase] - search all names that begin with [phrase]. [phrase] can be empty - lists all names \n"
+           "/search [phrase] - search all names that begin with [phrase]. [phrase] can be empty - lists all names \n"\
+           "/getpic [subreddit] - gets a random picture from the subreddit. The picture is taken from today's top 60"\
+    #       "/memegen <meme> '<top>' '<bottom>' - on the fly meme generator"
 
 
 # noinspection PyUnusedLocal
@@ -246,7 +254,7 @@ def build_remember_link(request):
         if request[1] in Links:
             return "This name already exists in the database"
         else:
-            Links[request[1]] = request[2]
+            Links[request[1]] = request[2]  # + ("v" if str(request[2].endswith(".gif")) else "") # can be activated
             save_links_file()
             return "'%s' remembered" % request[1]
     else:
@@ -305,6 +313,28 @@ def build_search_link(request):
         return "Wrong number of parameters. Usage /listlink [phrase]"
 
 
+def build_imgur_pic(request):
+    if type(request) == list and len(request) == 2:
+
+        req = urllib.request.Request("https://api.imgur.com/3/gallery/r/" + request[1] + "/top/week",
+                                     headers={"Authorization": ("Client-ID " + settings.imgur_api_client_id)})
+        response = send_http_query(req)  # urllib.request.urlopen(req).read()
+        if response_query:
+            json_data = json.loads(response.decode('utf-8'))
+            if json_data['data']:  # data is available
+                link_id = random.randint(0, len(json_data['data']) - 1)
+                retval = (str(json_data['data'][link_id]['title']) + " - "
+                          + str(json_data['data'][link_id]['link'] +
+                                ("v" if(str(json_data['data'][link_id]['link']).endswith(".gif")) else "")))
+                return retval
+            else:
+                return "images in subreddit '%s' not found in the past day" % request[1]
+        else:
+            return "internal error. please try again."
+    else:
+        return "Wrong number of parameters. Usage /getpic [subreddit]"
+
+
 def process(update):
     request = str(update['message']['text']) if 'text' in update['message'] else "$$"
     global chat_id
@@ -342,7 +372,8 @@ def process(update):
             "remember": build_remember_link,
             "forget": build_forget_link,
             "recall": build_recall_link,
-            "search": build_search_link
+            "search": build_search_link,
+            "getpic": build_imgur_pic
         }
         response = switcher[request[0]](request) if request[0] in switcher else False
         log("Request - " + str(request))
@@ -408,7 +439,12 @@ log("bot is now listening")
 while not shutdown:
     # getUpdates from server
     response_query = send_http_query(build_update_url(str(updateID)))
-    jsonData = json.loads(response_query.decode('utf-8'))
+    if response_query:
+        jsonData = json.loads(response_query.decode('utf-8'))
+    else:
+        time.sleep(updateFrequency)
+        continue  # request new http query
+
     if jsonData['ok']:
         if jsonData['result']:
             for http_update in jsonData['result']:
@@ -422,8 +458,7 @@ while not shutdown:
                 no_data_cnt = 0
                 log("No data to parse")
     else:
-        log("Unhandled exception. JSON 'ok' field false. Exiting ")
-        shutdown = True
+        log("JSON 'ok' field false ")
 
     if save_stats_cnt < 300:  # every 5 minutes
         save_stats_cnt += 1
