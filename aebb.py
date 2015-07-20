@@ -365,10 +365,11 @@ def process(update):
 
         if request:
             if "@" in request:
-                target = request.split("@",1)[1]
-                request = request.split("@",1)[0]
-                if target != bot_username:
+                target = request.split("@",1)[1].split(" ")
+                if target[0] != bot_username:
                     return
+                else:
+                    request = request.replace("@"+bot_username, "")
 
             request = request.split()
         else:
