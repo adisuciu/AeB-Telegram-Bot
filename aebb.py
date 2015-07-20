@@ -53,6 +53,7 @@ urlParserSafeChars = '/:&?=\\'
 botprefix = '/'
 bot_id = 0
 chat_id = 0
+bot_username = ""
 message_id = 0
 no_data_cnt = 0
 save_stats_cnt = 0
@@ -101,6 +102,8 @@ def init_bot(json_data):
         if json_data['result']:  # if a result is present in the JSON list
             global bot_id
             bot_id = json_data['result']['id']
+            global bot_username
+            bot_username = json_data['result']['username']
             return True
         else:
             log("Unhandled exception: no result found on getMe method.")
@@ -359,7 +362,14 @@ def process(update):
     # process received commands
     if request.startswith(botprefix):
         request = request.split(botprefix, 1)[1]
+
         if request:
+            if "@" in request:
+                target = request.split("@",1)[1]
+                request = request.split("@",1)[0]
+                if target != bot_username:
+                    return
+
             request = request.split()
         else:
             return
