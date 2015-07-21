@@ -7,9 +7,8 @@ import datetime
 import random
 import os
 import settings
-
+import meme
 # TODO:
-# - on the fly meme gen
 # - google image search (to replace imgbot)
 # - break code down in modules
 
@@ -48,7 +47,7 @@ getMe = "getMe"
 getUpdates = "getUpdates"
 sendMessage = "sendMessage"
 parameters = ""
-urlParserSafeChars = '/:&?=\\'
+urlParserSafeChars = '%/:&?=\\'
 botprefix = '/'
 bot_id = 0
 chat_id = 0
@@ -132,10 +131,6 @@ def build_getme_url():
     return urllib.parse.quote_plus(botQueryURL + getMe, urlParserSafeChars)
 
 
-def get_update():
-    pass
-
-
 def send_http_query(query):
     result_qry = ""
     # review this part
@@ -167,7 +162,7 @@ def send_message(message):
 def build_help(request=0):
     return "/help - this help\n" \
            "/about - about this bot\n" \
-           "/bug_quote - requests random BUG MAFIA quote\n" \
+           "/quote <bug/ciuraru> - requests random BUG MAFIA/Ciuraru quote\n" \
            "/list_users - lists active users of this chat\n" \
            "/stats_daily - lists statistics for the active users of this chat\n" \
            "/stats_alltime - lists statistics for this chat session\n"\
@@ -177,14 +172,23 @@ def build_help(request=0):
            "/recall <name> [hide/nsfw] - recalls the <phrase> with name <name> - [hide][nsfw] - hides preview\n"\
            "/search [phrase] - search all names that begin with [phrase]. [phrase] can be empty - lists all names \n"\
            "/getpic [subreddit] - gets a random picture from the subreddit. The picture is taken from today's top 60"\
-    #       "/memegen <meme> '<top>' '<bottom>' - on the fly meme generator"
+           "/memegen <meme> '<top>' '<bottom>' - on the fly meme generator"\
+           "/search_meme [phrase] - search all the available memes that begin with phrase"
+
+
+def build_quote(request=0):
+    if len(request)==2:
+        switcher = {"bug": "bug_mafia.txt",
+                    "ciuraru": "ciuraru.txt"}
+        return build_quote_file(request, switcher[request[1]]) if request[1] in switcher else False
 
 
 # noinspection PyUnusedLocal
-def build_bug_quote(request=0):
-    with open(settings.quote_file) as file:
+def build_quote_file(request=0,quote_file="bug_mafia.txt"):
+    if not quote_file:
+        return "No quotes found. Usage quote <bug/ciuraru>"
+    with open(quote_file) as file:
         content = file.readlines()
-    file.close()
     string = content[random.randint(0, len(content) - 1)]  # return random string from file
     decoded_string = bytes(string, "utf-8").decode("unicode_escape")  # parse escape sequences such as \n
     return decoded_string
@@ -214,7 +218,6 @@ def build_stats(request=0, chat_var=Chats):
 
         string += (namestring + " - " + str(number_of_msg) + " messages in " + str(number_of_min) + " minutes ") + "\n"
     return string
-    pass
 
 
 # noinspection PyUnusedLocal
@@ -295,6 +298,14 @@ def build_forget_link(request):
         return "Wrong number of parameters. Usage: /forget <name>"
 
 
+def find_memes_contain(cont=""):
+    retval = []
+    for key,value in sorted(meme.Dict.items()):
+        if cont in key:
+            retval.append(key)
+    return retval
+
+
 def find_links_startwith(sw=""):
     retval = []
     for link in Links:
@@ -357,6 +368,51 @@ def build_imgur_pic(request):
         return "Wrong number of parameters. Usage /getpic [subreddit]"
 
 
+def build_meme_gen(request):
+    if len(request) == 2:
+        return "http://apimeme.com/meme?meme=%s%%26top=%%26bottom=" % (meme.Dict[request[1]])
+    if len(request) <= 4:
+        return "Wrong number of parameters. Usage /memegen <meme> '<text1>' '<text2>'"
+
+    if request[1] not in meme.Dict:
+        return "Meme %s not found. Did you mean: %s" % (request[1], "'" +
+                                                               "', '".join(find_memes_contain(request[1])) + "'")
+
+    margins = []
+    i = 2
+    for words in request[2:]:
+        if words == "'" or words.startswith("'"):
+            margins.append(i)
+        if words not in {"'","''"} and words.endswith("'"):  # different word - not particularly proud of this piece of code
+            margins.append(i)
+        if words == "''":
+            margins.append(i)
+            margins.append(i)
+        i += 1
+
+    if len(margins) != 4:
+        return "toptext, bottomtext should be inside quotation marks"
+
+    toptext = ""
+    for words in request[margins[0]:margins[1] + 1]:
+        toptext += (words.replace("'", "")) + "+"
+    bottomtext = ""
+    for words in request[margins[2]:margins[3] + 1]:
+        bottomtext += (words.replace("'", "")) + "+"
+    retval = "http://apimeme.com/meme?meme=%s%%26top=%s%%26bottom=%s" % (meme.Dict[request[1]], toptext, bottomtext)
+    return retval
+
+
+def build_search_memes(request):
+    if type(request) == list and len(request) in {1, 2}:
+        string = "Currently implemented memes %sare:\n" % \
+                 (("that contain with '%s' " % request[1]) if len(request) == 2 else "")
+        string += "'" + "', '".join(find_memes_contain(request[1] if len(request) == 2 else '')) + "'"
+        return string
+    else:
+        return "Wrong number of parameters. Usage /search_meme [phrase]"
+
+
 def process(update):
     request = str(update['message']['text']) if 'text' in update['message'] else "$$"
     global chat_id
@@ -398,7 +454,7 @@ def process(update):
         switcher = {
             "": dummy,
             "help": build_help,
-            "bug_quote": build_bug_quote,
+            "quote": build_quote,
             "stats_alltime": build_alltime_stats,
             "stats_daily": build_daily_stats,
             "about": build_about,
@@ -410,7 +466,9 @@ def process(update):
             "forget": build_forget_link,
             "recall": build_recall_link,
             "search": build_search_link,
-            "getpic": build_imgur_pic
+            "getpic": build_imgur_pic,
+            "memegen": build_meme_gen,
+            "search_meme": build_search_memes
         }
         response = switcher[request[0]](request) if request[0] in switcher else False
         log("Request - " + str(request))
@@ -455,7 +513,6 @@ def save_stats(request=0):
     with open(settings.stats_file, mode='w') as file:
         file.write(output)
     log("Stats saved")
-    pass
 
 
 log("getMe() - verifies HTTPS connectivity to Telegram API")
