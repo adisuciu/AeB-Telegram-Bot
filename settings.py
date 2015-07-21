@@ -1,9 +1,8 @@
 import datetime
+
 botToken = "116918828:AAGPLaxUREwHTkk3Y09J_a0ETX1bYaHTGrs"
 botQueryURL = "https://api.telegram.org/bot%s/" % (botToken)
 imgur_api_client_id = "afc6b8634860754"
-imgflip_username = "AeBBot"
-imgflip_password = "aebbotpassword"
 dt = datetime.datetime.now()
 updateFrequency = 1.5  # seconds
 quote_file = "bug_mafia.txt"
