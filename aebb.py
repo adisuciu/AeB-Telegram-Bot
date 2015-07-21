@@ -11,7 +11,6 @@ import settings
 # TODO:
 # - on the fly meme gen
 # - google image search (to replace imgbot)
-# - implement daily stats
 # - break code down in modules
 
 start_time = time.time()
@@ -58,8 +57,10 @@ message_id = 0
 no_data_cnt = 0
 save_stats_cnt = 0
 Chats = {}  # dictionary {chat_id : {user_id : UserStat}}
+SessionChats = {}
 Links = {}
 nsfw_tag = False
+daily_stats_reset = 0
 
 
 class UserStat:
@@ -168,7 +169,8 @@ def build_help(request=0):
            "/about - about this bot\n" \
            "/bug_quote - requests random BUG MAFIA quote\n" \
            "/list_users - lists active users of this chat\n" \
-           "/chat_stats - lists statistics for the active users of this chat\n" \
+           "/stats_daily - lists statistics for the active users of this chat\n" \
+           "/stats_alltime - lists statistics for this chat session\n"\
            "/uptime - shows the uptime of the bot\n"\
            "/remember <name> <phrase> - maps <phrase> to a <name>. if name contains nsfw, no preview will be shown on recall\n"\
            "/forget <name> - forgets <name> and attached <phrase>\n"\
@@ -189,16 +191,26 @@ def build_bug_quote(request=0):
 
 
 # noinspection PyUnusedLocal
-def build_stats(request=0):
+def build_alltime_stats(request=0):
+    return build_stats(request, Chats)
+
+
+# noinspection PyUnusedLocal
+def build_daily_stats(request=0):
+    return build_stats(request, SessionChats)
+
+
+# noinspection PyUnusedLocal
+def build_stats(request=0, chat_var=Chats):
     string = "Chat activity statistics are:\n"
-    if not Chats[chat_id]:
+    if not chat_var[chat_id]:
         return "No stats for this chat"
-    for user in Chats[chat_id]:
-        username = Chats[chat_id][user].get_user()[0]
-        name = (Chats[chat_id][user].get_user()[1] + " " + (Chats[chat_id][user].get_user()[2]))
+    for user in chat_var[chat_id]:
+        username = chat_var[chat_id][user].get_user()[0]
+        name = (chat_var[chat_id][user].get_user()[1] + " " + (chat_var[chat_id][user].get_user()[2]))
         namestring = username if username else name
-        number_of_msg = Chats[chat_id][user].get_msgcount()
-        number_of_min = Chats[chat_id][user].get_timecount()
+        number_of_msg = chat_var[chat_id][user].get_msgcount()
+        number_of_min = chat_var[chat_id][user].get_timecount()
 
         string += (namestring + " - " + str(number_of_msg) + " messages in " + str(number_of_min) + " minutes ") + "\n"
     return string
@@ -262,6 +274,13 @@ def build_remember_link(request):
             return "'%s' remembered" % request[1]
     else:
         return "Wrong number of parameters. Usage: /remember <name> <link>"
+
+
+# noinspection PyUnusedLocal
+def reset_daily_stats(request=0):
+    global SessionChats
+    SessionChats = {}
+    return "Daily stats reset"
 
 
 def build_forget_link(request):
@@ -351,13 +370,14 @@ def process(update):
     message_timestamp = update['message']['date']
 
     # update stats
-    if chat_id in Chats:
-        if user_id in Chats[chat_id]:
-            Chats[chat_id][user_id].new_message(message_timestamp)
+    for chat_var in [Chats, SessionChats]:
+        if chat_id in chat_var:
+            if user_id in chat_var[chat_id]:
+                chat_var[chat_id][user_id].new_message(message_timestamp)
+            else:
+                chat_var[chat_id][user_id] = UserStat([username, first_name, last_name], timestamp=message_timestamp)
         else:
-            Chats[chat_id][user_id] = UserStat([username, first_name, last_name], timestamp=message_timestamp)
-    else:
-        Chats[chat_id] = {user_id: UserStat([username, first_name, last_name], timestamp=message_timestamp)}
+            chat_var[chat_id] = {user_id: UserStat([username, first_name, last_name], timestamp=message_timestamp)}
 
     # process received commands
     if request.startswith(botprefix):
@@ -365,11 +385,11 @@ def process(update):
 
         if request:
             if "@" in request:
-                target = request.split("@",1)[1].split(" ")
+                target = request.split("@", 1)[1].split(" ")
                 if target[0] != bot_username:
                     return
                 else:
-                    request = request.replace("@"+bot_username, "")
+                    request = request.replace("@" + bot_username, "")
 
             request = request.split()
         else:
@@ -379,11 +399,13 @@ def process(update):
             "": dummy,
             "help": build_help,
             "bug_quote": build_bug_quote,
-            "chat_stats": build_stats,
+            "stats_alltime": build_alltime_stats,
+            "stats_daily": build_daily_stats,
             "about": build_about,
             "uptime": build_uptime,
             "list_users": list_users,
             "save_stats": save_stats,
+            "reset_daily": reset_daily_stats,
             "remember": build_remember_link,
             "forget": build_forget_link,
             "recall": build_recall_link,
@@ -480,5 +502,13 @@ while not shutdown:
     else:
         save_stats_cnt = 0
         save_stats()
+
+    # reset daily stats @03:00 am
+    if datetime.datetime.now().hour == 3 and datetime.datetime.now().minute == 0:
+        if daily_stats_reset == 0:
+            log(reset_daily_stats())
+            daily_stats_reset = 1
+        else:
+            daily_stats_reset = 0
 
     time.sleep(updateFrequency)
