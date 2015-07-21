@@ -171,9 +171,9 @@ def build_help(request=0):
            "/forget <name> - forgets <name> and attached <phrase>\n"\
            "/recall <name> [hide/nsfw] - recalls the <phrase> with name <name> - [hide][nsfw] - hides preview\n"\
            "/search [phrase] - search all names that begin with [phrase]. [phrase] can be empty - lists all names \n"\
-           "/getpic [subreddit] - gets a random picture from the subreddit. The picture is taken from today's top 60"\
-           "/memegen <meme> '<top>' '<bottom>' - on the fly meme generator"\
-           "/search_meme [phrase] - search all the available memes that begin with phrase"
+           "/getpic [subreddit] - gets a random picture from the subreddit. The picture is taken from today's top 60\n"\
+           "/memegen <meme> '<top>' '<bottom>' - on the fly meme generator\n"\
+           "/search_meme [phrase] - search all the available memes that begin with phrase\n"
 
 
 def build_quote(request=0):
