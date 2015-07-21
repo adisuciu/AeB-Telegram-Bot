@@ -61,5 +61,6 @@ target/
 .idea/
 *.txt
 !bug_mafia.txt
+!ciuraru.txt
 !requirements.txt
 !runtime.txt
