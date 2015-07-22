@@ -189,6 +189,9 @@ def build_quote_file(request=0,quote_file="bug_mafia.txt"):
         return "No quotes found. Usage quote <bug/ciuraru>"
     with open(quote_file) as file:
         content = file.readlines()
+    for string in content:
+        print (string)
+        bytes(string,"utf-8")
     string = content[random.randint(0, len(content) - 1)]  # return random string from file
     decoded_string = bytes(string, "utf-8").decode("unicode_escape")  # parse escape sequences such as \n
     return decoded_string
@@ -370,7 +373,8 @@ def build_imgur_pic(request):
 
 def build_meme_gen(request):
     if len(request) == 2:
-        return "http://apimeme.com/meme?meme=%s%%26top=%%26bottom=" % (meme.Dict[request[1]])
+        return ("http://apimeme.com/meme?meme=%s%%26top=%%26bottom=" % (meme.Dict[request[1]])) if request[1] in meme.Dict else "Meme %s not found. Did you mean: %s" % (request[1], "'" +
+                                                               "', '".join(find_memes_contain(request[1])) + "'")
     if len(request) <= 4:
         return "Wrong number of parameters. Usage /memegen <meme> '<text1>' '<text2>'"
 
@@ -470,8 +474,8 @@ def process(update):
             "memegen": build_meme_gen,
             "search_meme": build_search_memes
         }
-        response = switcher[request[0]](request) if request[0] in switcher else False
         log("Request - " + str(request))
+        response = switcher[request[0]](request) if request[0] in switcher else False
         log("Response - " + str(response))
         if response:
             send_message(response)
