@@ -189,6 +189,9 @@ def build_quote_file(request=0,quote_file="bug_mafia.txt"):
         return "No quotes found. Usage quote <bug/ciuraru>"
     with open(quote_file) as file:
         content = file.readlines()
+    for string in content:
+        print (string)
+        bytes(string,"utf-8")
     string = content[random.randint(0, len(content) - 1)]  # return random string from file
     decoded_string = bytes(string, "utf-8").decode("unicode_escape")  # parse escape sequences such as \n
     return decoded_string
