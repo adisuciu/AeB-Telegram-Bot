@@ -8,9 +8,10 @@ import random
 import os
 import settings
 import meme
+import shlex
+
 # TODO:
 # - google image search (to replace imgbot)
-# - break code down in modules
 
 start_time = time.time()
 with open(settings.log_file, mode='w') as f:  # delete previous file
@@ -47,7 +48,6 @@ getMe = "getMe"
 getUpdates = "getUpdates"
 sendMessage = "sendMessage"
 parameters = ""
-urlParserSafeChars = '%/:&?=\\'
 botprefix = '/'
 bot_id = 0
 chat_id = 0
@@ -114,21 +114,18 @@ def init_bot(json_data):
 
 
 def build_update_url(update_id):
-    return urllib.parse.quote_plus(botQueryURL + getUpdates + "?offset=" + update_id, urlParserSafeChars)
+    return botQueryURL + getUpdates + "?offset=" + urllib.parse.quote_plus(update_id)
 
 
 def build_sendmessage_url(message):
-    return urllib.parse.quote_plus(botQueryURL + sendMessage
-                                   + "?chat_id=" + str(chat_id)
-                                   + '&text=' + message
-                                   + '&disable_web_page_preview=' + str(nsfw_tag)
-                                   # uncomment next line to enable reply to message
-                                   # + '&reply_to_message_id='+str(message_id)
-                                   , urlParserSafeChars)
+    return botQueryURL + sendMessage + "?chat_id=" + str(chat_id) + '&text=' + \
+        urllib.parse.quote_plus(message) + '&disable_web_page_preview=' + str(nsfw_tag)
+    # uncomment next line to enable reply to message
+    # + '&reply_to_message_id='+str(message_id)
 
 
 def build_getme_url():
-    return urllib.parse.quote_plus(botQueryURL + getMe, urlParserSafeChars)
+    return botQueryURL + getMe
 
 
 def send_http_query(query):
@@ -176,15 +173,15 @@ def build_help(request=0):
            "/search_meme [phrase] - search all the available memes that begin with phrase\n"
 
 
-def build_quote(request=0):
-    if len(request)==2:
+def build_quote(request):
+    if len(request) == 2:
         switcher = {"bug": "bug_mafia.txt",
                     "ciuraru": "ciuraru.txt"}
         return build_quote_file(request, switcher[request[1]]) if request[1] in switcher else False
 
 
 # noinspection PyUnusedLocal
-def build_quote_file(request=0,quote_file="bug_mafia.txt"):
+def build_quote_file(request=0, quote_file="bug_mafia.txt"):
     if not quote_file:
         return "No quotes found. Usage quote <bug/ciuraru>"
     with open(quote_file) as file:
@@ -300,7 +297,7 @@ def build_forget_link(request):
 
 def find_memes_contain(cont=""):
     retval = []
-    for key,value in sorted(meme.Dict.items()):
+    for key, value in sorted(meme.Dict.items()):
         if cont in key:
             retval.append(key)
     return retval
@@ -370,37 +367,19 @@ def build_imgur_pic(request):
 
 def build_meme_gen(request):
     if len(request) == 2:
-        return ("http://apimeme.com/meme?meme=%s%%26top=%%26bottom=" % (meme.Dict[request[1]])) if request[1] in meme.Dict else "Meme %s not found. Did you mean: %s" % (request[1], "'" +
-                                                               "', '".join(find_memes_contain(request[1])) + "'")
-    if len(request) <= 4:
+        toptext = ""
+        bottomtext = ""
+    elif len(request) < 4:
         return "Wrong number of parameters. Usage /memegen <meme> '<text1>' '<text2>'"
+    else:
+        toptext = urllib.parse.quote_plus(request[2])
+        bottomtext = urllib.parse.quote_plus(request[3])
 
     if request[1] not in meme.Dict:
         return "Meme %s not found. Did you mean: %s" % (request[1], "'" +
-                                                               "', '".join(find_memes_contain(request[1])) + "'")
+                                                        "', '".join(find_memes_contain(request[1])) + "'")
 
-    margins = []
-    i = 2
-    for words in request[2:]:
-        if words == "'" or words.startswith("'"):
-            margins.append(i)
-        if words not in {"'","''"} and words.endswith("'"):  # different word - not particularly proud of this piece of code
-            margins.append(i)
-        if words == "''":
-            margins.append(i)
-            margins.append(i)
-        i += 1
-
-    if len(margins) != 4:
-        return "toptext, bottomtext should be inside quotation marks"
-
-    toptext = ""
-    for words in request[margins[0]:margins[1] + 1]:
-        toptext += (words.replace("'", "")) + "+"
-    bottomtext = ""
-    for words in request[margins[2]:margins[3] + 1]:
-        bottomtext += (words.replace("'", "")) + "+"
-    retval = "http://apimeme.com/meme?meme=%s%%26top=%s%%26bottom=%s" % (meme.Dict[request[1]], toptext, bottomtext)
+    retval = "http://apimeme.com/meme?meme=%s&top=%s&bottom=%s" % (meme.Dict[request[1]], toptext, bottomtext)
     return retval
 
 
@@ -438,19 +417,9 @@ def process(update):
 
     # process received commands
     if request.startswith(botprefix):
+
         request = request.split(botprefix, 1)[1]
-
-        if request:
-            if "@" in request:
-                target = request.split("@", 1)[1].split(" ")
-                if target[0] != bot_username:
-                    return
-                else:
-                    request = request.replace("@" + bot_username, "")
-
-            request = request.split()
-        else:
-            return
+        request = shlex.split(request)
 
         switcher = {
             "": dummy,
