@@ -17,7 +17,6 @@ start_time = time.time()
 with open(settings.log_file, mode='w') as f:  # delete previous file
     pass
 
-
 def get_uptime():
     sec = datetime.timedelta(seconds=int((time.time() - start_time)))
     d = datetime.datetime(1, 1, 1) + sec
@@ -60,7 +59,7 @@ SessionChats = {}
 Links = {}
 nsfw_tag = False
 daily_stats_reset = 0
-
+requester = ""
 
 class UserStat:
     def __init__(self, user, msgcount=1, timecount=1, timestamp=1):
@@ -380,6 +379,9 @@ def build_meme_gen(request):
                                                         "', '".join(find_memes_contain(request[1])) + "'")
 
     retval = "http://apimeme.com/meme?meme=%s&top=%s&bottom=%s" % (meme.Dict[request[1]], toptext, bottomtext)
+    with open("meme_history", "a") as f:
+        dt = datetime.datetime.now()
+        f.write("[%d-%02d-%02d-%02d:%02d:%02d] <%s> %s\n" %(dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second, requester, retval))
     return retval
 
 
@@ -403,6 +405,11 @@ def process(update):
     username = update['message']['from']['username'] if 'username' in update['message']['from'] else 0
     first_name = update['message']['from']['first_name'] if 'first_name' in update['message']['from'] else 0
     last_name = update['message']['from']['last_name'] if 'last_name' in update['message']['from'] else 0
+    name = (first_name+" ") if first_name else ""
+    name += last_name if last_name else ""
+    global requester
+    requester = username if username else name
+
     message_timestamp = update['message']['date']
 
     # update stats
