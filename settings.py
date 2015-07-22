@@ -1,8 +1,10 @@
 import datetime
 
-botToken = "116918828:AAGPLaxUREwHTkk3Y09J_a0ETX1bYaHTGrs"
+with open("bottoken","r") as f:
+    botToken = f.read()
 botQueryURL = "https://api.telegram.org/bot%s/" % (botToken)
-imgur_api_client_id = "afc6b8634860754"
+with open("imgurtoken","r") as f:
+    imgur_api_client_id = f.read()
 dt = datetime.datetime.now()
 updateFrequency = 1.5  # seconds
 quote_file = "bug_mafia.txt"
