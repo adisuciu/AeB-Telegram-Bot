@@ -1,9 +1,9 @@
 import datetime
 
-with open("bottoken","r") as f:
+with open("bottoken", "r") as f:
     botToken = f.read()
-botQueryURL = "https://api.telegram.org/bot%s/" % (botToken)
-with open("imgurtoken","r") as f:
+botQueryURL = "https://api.telegram.org/bot%s/" % botToken
+with open("imgurtoken", "r") as f:
     imgur_api_client_id = f.read()
 dt = datetime.datetime.now()
 updateFrequency = 1.5  # seconds
