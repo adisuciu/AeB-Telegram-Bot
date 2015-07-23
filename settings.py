@@ -13,6 +13,8 @@ log_file = "log-%d%02d%02d-%02d%02d%02d.txt" % (dt.year, dt.month, dt.day, dt.ho
 image_temp_file = "temp.jpg"
 # log_file = "log.txt"
 stats_file = "stats.txt"
+with open("font","r") as f:
+    font_location = f.read()
 about_message = "Aici este BAIETII Official bot - v0.1\nSources available at: " \
                 "https://github.com/adisuciu/AeB-Telegram-Bot\n"
 

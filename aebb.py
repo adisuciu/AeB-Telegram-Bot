@@ -419,7 +419,7 @@ def build_meme_from_link(request):
 
     # search appropriate font size
     for i in range(100):
-        font = ImageFont.truetype("IMPACT.ttf", i)
+        font = ImageFont.truetype(settings.font_location, i)
         toptextsize = font.getsize(toptext)[0]
         if textwidth < toptextsize:
             break
@@ -430,7 +430,7 @@ def build_meme_from_link(request):
     # search appropriate font size
     bottextsize = 0
     for i in range(100):
-        font = ImageFont.truetype("IMPACT.ttf", i)
+        font = ImageFont.truetype(settings.font_location, i)
         bottextsize = font.getsize(bottomtext)[0]
         bottextheight = font.getsize(bottomtext)[1]
         if textwidth < bottextsize:
