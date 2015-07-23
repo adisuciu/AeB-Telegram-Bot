@@ -413,8 +413,8 @@ def build_meme_from_link(request):
     bottomtext = request[3]
     shadowcolor = "black"
     fillcolor = "white"
-    width = img.width
-    height = img.height
+    width = img.size[0]
+    height = img.size[1]
     textwidth = width - 100
 
     # search appropriate font size
