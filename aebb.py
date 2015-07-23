@@ -389,17 +389,25 @@ def DrawOutlinedText(image, coords, text, font, outline="black", fill="white"):
 
 
 def build_meme_from_link(request):
-    response = urllib.request.urlopen(request[1])
-    file = io.BytesIO(response.read())
+
+    response = send_http_query(request[1])
+    if response:
+        file = io.BytesIO(response)
+    else:
+        return "URL not found"
+
     log("image loaded from %s " % request[1])
-    basewidth = 500
+    basewidth = 640
 
     # resize file to base width 500
+
     img = Image.open(file)
     wpercent = (basewidth / float(img.size[0]))
-    hsize = int(float(img.size[1]) * float(wpercent))
-    img = img.resize((basewidth, hsize), PIL.Image.ANTIALIAS)
-    log("image resized")
+    if 0.9 <= wpercent <= 1.1:
+        hsize = int(float(img.size[1]) * float(wpercent))
+        img = img.resize((basewidth, hsize), PIL.Image.ANTIALIAS)
+        log("image resized")
+
     draw = ImageDraw.Draw(img)
     toptext = request[2]
     bottomtext = request[3]
@@ -440,11 +448,14 @@ def build_meme_from_link(request):
     log("Upload start")
     req = urllib.request.Request("https://api.imgur.com/3/upload", data=binary_data,
                                  headers={"Authorization": ("Client-ID " + settings.imgur_api_client_id)})
-    response = urllib.request.urlopen(req).read()
-    log("Upload finish")
-
-    json_data = json.loads(response.decode('utf-8'))
-    return json_data['data']['link']
+    response = send_http_query(req)
+    if response:
+        log("Upload finish")
+        json_data = json.loads(response.decode('utf-8'))
+        return json_data['data']['link']
+    else:
+        log("Upload failed")
+        return "Upload to imgur failed"
 
 
 def build_meme_gen(request):
