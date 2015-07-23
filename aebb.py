@@ -72,6 +72,7 @@ nsfw_tag = False
 daily_stats_reset = 0
 requester = ""
 
+
 class UserStat:
     def __init__(self, user, msgcount=1, timecount=1, timestamp=1):
         self.msgcount = msgcount
@@ -377,7 +378,7 @@ def build_imgur_pic(request):
 
 def DrawOutlinedText(image, coords, text, font, outline="black", fill="white"):
     if type(coords) != tuple:
-        raise "coords not tuple"
+        raise ValueError("coords not tuple")
     x = coords[0]
     y = coords[1]
     image.text((x - 1, y - 1), text, font=font, fill=outline)
@@ -428,7 +429,7 @@ def build_meme_from_link(request):
             break
 
     # draw bottom text
-    DrawOutlinedText(draw, ((width - bottextsize)/2, height - bottextheight - 5), bottomtext,
+    DrawOutlinedText(draw, ((width - bottextsize) / 2, height - bottextheight - 5), bottomtext,
                      font=font, outline=shadowcolor, fill=fillcolor)
 
     img.save(settings.image_temp_file, quality=50)
@@ -526,7 +527,10 @@ def process(update):
     if request.startswith(botprefix):
 
         request = request.split(botprefix, 1)[1]
-        request = shlex.split(request)
+        try:
+            request = shlex.split(request)
+        except ValueError:
+            return
 
         switcher = {
             "": dummy,
