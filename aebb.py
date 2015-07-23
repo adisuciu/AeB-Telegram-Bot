@@ -1,3 +1,5 @@
+__author__ = 'adrian.suciu'
+
 import urllib.request
 import urllib.parse
 import json
@@ -9,6 +11,15 @@ import os
 import settings
 import meme
 import shlex
+import io
+import mimetypes
+import base64
+from base64 import b64encode
+
+import PIL
+from PIL import ImageFont
+from PIL import Image
+from PIL import ImageDraw
 
 # TODO:
 # - google image search (to replace imgbot)
@@ -302,10 +313,10 @@ def find_memes_contain(cont=""):
     return retval
 
 
-def find_links_startwith(sw=""):
+def find_links_contain(cont=""):
     retval = []
     for link in Links:
-        if str(link).startswith(sw):
+        if cont in str(link):
             retval.append(link)
     return retval
 
@@ -325,7 +336,7 @@ def build_recall_link(request):
             return str(Links[request[1]])
         else:
             return "'%s' cannot be found\nDid you mean any of the following: %s" % \
-                   (request[1], "'" + "', '".join(find_links_startwith(request[1])) + "'")
+                   (request[1], "'" + "', '".join(find_links_contain(request[1])) + "'")
     else:
         return "Wrong number of parameters. Usage /recall <name> [nsfw/hide]"
 
@@ -336,7 +347,7 @@ def build_search_link(request):
         load_links_file()
         string = "Currently remembered links %sare:\n" % \
                  (("that start with '%s' " % request[1]) if len(request) == 2 else "")
-        string += "'" + "', '".join(find_links_startwith(request[1] if len(request) == 2 else '')) + "'"
+        string += "'" + "', '".join(find_links_contain(request[1] if len(request) == 2 else '')) + "'"
         return string
     else:
         return "Wrong number of parameters. Usage /listlink [phrase]"
@@ -364,6 +375,77 @@ def build_imgur_pic(request):
         return "Wrong number of parameters. Usage /getpic [subreddit]"
 
 
+def DrawOutlinedText(image, coords, text, font, outline="black", fill="white"):
+    if type(coords) != tuple:
+        raise "coords not tuple"
+    x = coords[0]
+    y = coords[1]
+    image.text((x - 1, y - 1), text, font=font, fill=outline)
+    image.text((x + 1, y + 1), text, font=font, fill=outline)
+    image.text((x + 1, y - 1), text, font=font, fill=outline)
+    image.text((x - 1, y + 1), text, font=font, fill=outline)
+    image.text(coords, text, font=font, fill=fill)
+
+
+def build_meme_from_link(request):
+    response = urllib.request.urlopen(request[1])
+    file = io.BytesIO(response.read())
+    log("image loaded from %s " % request[1])
+    basewidth = 500
+
+    # resize file to base width 500
+    img = Image.open(file)
+    wpercent = (basewidth / float(img.size[0]))
+    hsize = int(float(img.size[1]) * float(wpercent))
+    img = img.resize((basewidth, hsize), PIL.Image.ANTIALIAS)
+    log("image resized")
+    draw = ImageDraw.Draw(img)
+    toptext = request[2]
+    bottomtext = request[3]
+    shadowcolor = "black"
+    fillcolor = "white"
+    width = img.width
+    height = img.height
+    textwidth = width - 100
+
+    # search appropriate font size
+    for i in range(100):
+        font = ImageFont.truetype("IMPACT.ttf", i)
+        toptextsize = font.getsize(toptext)[0]
+        if textwidth < toptextsize:
+            break
+
+    # draw top text
+    DrawOutlinedText(draw, ((width - toptextsize) / 2, 5), toptext, font=font, outline=shadowcolor, fill=fillcolor)
+
+    # search appropriate font size
+    bottextsize = 0
+    for i in range(100):
+        font = ImageFont.truetype("IMPACT.ttf", i)
+        bottextsize = font.getsize(bottomtext)[0]
+        bottextheight = font.getsize(bottomtext)[1]
+        if textwidth < bottextsize:
+            break
+
+    # draw bottom text
+    DrawOutlinedText(draw, ((width - bottextsize)/2, height - bottextheight - 5), bottomtext,
+                     font=font, outline=shadowcolor, fill=fillcolor)
+
+    img.save(settings.image_temp_file, quality=50)
+    log("Text added to the image")
+    with open(settings.image_temp_file, "rb") as file:
+        data = urllib.parse.urlencode({'image': b64encode(file.read())})
+    binary_data = data.encode('ASCII')
+    log("Upload start")
+    req = urllib.request.Request("https://api.imgur.com/3/upload", data=binary_data,
+                                 headers={"Authorization": ("Client-ID " + settings.imgur_api_client_id)})
+    response = urllib.request.urlopen(req).read()
+    log("Upload finish")
+
+    json_data = json.loads(response.decode('utf-8'))
+    return json_data['data']['link']
+
+
 def build_meme_gen(request):
     if len(request) == 2:
         toptext = ""
@@ -375,13 +457,31 @@ def build_meme_gen(request):
         bottomtext = urllib.parse.quote_plus(request[3])
 
     if request[1] not in meme.Dict:
-        return "Meme %s not found. Did you mean: %s" % (request[1], "'" +
-                                                        "', '".join(find_memes_contain(request[1])) + "'")
+        if(request[1]) not in Links:
+            pass
 
-    retval = "http://apimeme.com/meme?meme=%s&top=%s&bottom=%s" % (meme.Dict[request[1]], toptext, bottomtext)
-    with open("meme_history", "a") as f:
+        else:  # request is in links dictionary
+            request[1] = Links[request[1]]  # change request to link
+
+        url = request[1]
+        parsed_url = urllib.parse.urlparse(url)
+        if not bool(parsed_url.scheme):
+            return "Meme %s not found. Did you mean: %s" % (request[1], "'" +
+                                                            "', '".join(find_memes_contain(request[1])) + "'" +
+                                                            "', '".join(find_links_contain(request[1])) + "'")
+        maintype = mimetypes.guess_type(parsed_url.path)[0]
+
+        if maintype not in ('image/png', 'image/jpeg'):
+            return "URL is not a png or jpeg"
+
+        retval = build_meme_from_link(request)
+    else:  # request in meme dictionary
+        retval = "http://apimeme.com/meme?meme=%s&top=%s&bottom=%s" % (meme.Dict[request[1]], toptext, bottomtext)
+
+    with open("meme_history", "a") as file:
         dt = datetime.datetime.now()
-        f.write("[%d-%02d-%02d-%02d:%02d:%02d] <%s> %s\n" %(dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second, requester, retval))
+        file.write("[%d-%02d-%02d-%02d:%02d:%02d] <%s> %s\n" % (dt.year, dt.month, dt.day, dt.hour, dt.minute,
+                                                                dt.second, requester, retval))
     return retval
 
 
@@ -402,10 +502,10 @@ def process(update):
     global message_id
     message_id = update['message']['message_id']
     user_id = update['message']['from']['id']
-    username = update['message']['from']['username'] if 'username' in update['message']['from'] else 0
-    first_name = update['message']['from']['first_name'] if 'first_name' in update['message']['from'] else 0
-    last_name = update['message']['from']['last_name'] if 'last_name' in update['message']['from'] else 0
-    name = (first_name+" ") if first_name else ""
+    username = update['message']['from']['username'] if 'username' in update['message']['from'] else False
+    first_name = update['message']['from']['first_name'] if 'first_name' in update['message']['from'] else False
+    last_name = update['message']['from']['last_name'] if 'last_name' in update['message']['from'] else False
+    name = (first_name + " ") if first_name else ""
     name += last_name if last_name else ""
     global requester
     requester = username if username else name
@@ -445,7 +545,7 @@ def process(update):
             "search": build_search_link,
             "getpic": build_imgur_pic,
             "memegen": build_meme_gen,
-            "search_meme": build_search_memes
+            "search_meme": build_search_memes,
         }
         log("Request - " + str(request))
         response = switcher[request[0]](request) if request[0] in switcher else False
