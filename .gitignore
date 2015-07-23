@@ -60,6 +60,12 @@ target/
 # AeBBot stuff:
 .idea/
 *.txt
+*.ttf
+bottoken
+font
+imgurtoken
+meme_history
+temp*.*
 !bug_mafia.txt
 !ciuraru.txt
 !requirements.txt
