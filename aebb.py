@@ -390,6 +390,12 @@ def DrawOutlinedText(image, coords, text, font, outline="black", fill="white"):
 
 def build_meme_from_link(request):
 
+    toptext = request[2] if len(request) == 4 else ""
+    bottomtext = request[3] if len(request) == 4 else ""
+
+    if not toptext and not bottomtext:
+        return request[1]
+
     response = send_http_query(request[1])
     if response:
         file = io.BytesIO(response)
@@ -409,8 +415,6 @@ def build_meme_from_link(request):
         log("image resized")
 
     draw = ImageDraw.Draw(img)
-    toptext = request[2]
-    bottomtext = request[3]
     shadowcolor = "black"
     fillcolor = "white"
     width = img.size[0]
