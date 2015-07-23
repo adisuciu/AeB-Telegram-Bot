@@ -432,12 +432,13 @@ def build_meme_from_link(request):
     for i in range(100):
         font = ImageFont.truetype(settings.font_location, i)
         bottextsize = font.getsize(bottomtext)[0]
-        bottextheight = font.getsize(bottomtext)[1]
+        # workaround for older PIL version that is used by pythonanywhere
+        bottextheight = i  # font.getsize(bottomtext)[1]
         if textwidth < bottextsize:
             break
 
     # draw bottom text
-    DrawOutlinedText(draw, ((width - bottextsize) / 2, height - bottextheight - 5), bottomtext,
+    DrawOutlinedText(draw, ((width - bottextsize) / 2, height - bottextheight - 10), bottomtext,
                      font=font, outline=shadowcolor, fill=fillcolor)
 
     img.save(settings.image_temp_file, quality=50)
