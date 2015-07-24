@@ -543,6 +543,16 @@ def process(update):
     if request.startswith(botprefix):
 
         request = request.split(botprefix, 1)[1]
+        if request:
+            if "@" in request:
+                target = request.split("@", 1)[1].split(" ")
+                if target[0] != bot_username:
+                    return
+                else:
+                    request = request.replace("@" + bot_username, "")
+        else:
+            return
+
         try:
             request = shlex.split(request)
         except ValueError:
