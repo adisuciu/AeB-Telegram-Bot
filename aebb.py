@@ -637,45 +637,50 @@ load_links_file()
 log("bot initialization successful")
 log("bot is now listening")
 
-while not shutdown:
-    # getUpdates from server
-    response_query = send_http_query(build_update_url(str(updateID)))
-    if response_query:
-        jsonData = json.loads(response_query.decode('utf-8'))
-    else:
-        time.sleep(updateFrequency)
-        continue  # request new http query
-
-    if jsonData['ok']:
-        if jsonData['result']:
-            for http_update in jsonData['result']:
-                # process updates
-                process(http_update)
-                updateID = http_update['update_id'] + 1
+try:
+    while not shutdown:
+        # getUpdates from server
+        response_query = send_http_query(build_update_url(str(updateID)))
+        if response_query:
+            jsonData = json.loads(response_query.decode('utf-8'))
         else:
-            if no_data_cnt < 30:  # every 30 seconds
-                no_data_cnt += 1
+            time.sleep(updateFrequency)
+            continue  # request new http query
+
+        if jsonData['ok']:
+            if jsonData['result']:
+                for http_update in jsonData['result']:
+                    # process updates
+                    process(http_update)
+                    updateID = http_update['update_id'] + 1
             else:
-                no_data_cnt = 0
-                log("No data to parse")
-    else:
-        log("JSON 'ok' field false ")
-
-    if save_stats_cnt < settings.stats_save_freq:  # every 5 minutes
-        save_stats_cnt += 1
-    else:
-        save_stats_cnt = 0
-        save_stats()
-
-        with open('sync','w') as f: # for sync with other process
-            f.write(int(time.time()))
-
-    # reset daily stats @03:00 am
-    if datetime.datetime.now().hour == 3 and datetime.datetime.now().minute == 0:
-        if daily_stats_reset == 0:
-            log(reset_daily_stats())
-            daily_stats_reset = 1
+                if no_data_cnt < 30:  # every 30 seconds
+                    no_data_cnt += 1
+                else:
+                    no_data_cnt = 0
+                    log("No data to parse")
         else:
-            daily_stats_reset = 0
+            log("JSON 'ok' field false ")
 
-    time.sleep(updateFrequency)
+        if save_stats_cnt < settings.stats_save_freq:  # every 5 minutes
+            save_stats_cnt += 1
+        else:
+            save_stats_cnt = 0
+            save_stats()
+
+            with open('sync','w') as f: # for sync with other process
+                f.write(str(int(time.time())))
+
+        # reset daily stats @03:00 am
+        if datetime.datetime.now().hour == 3 and datetime.datetime.now().minute == 0:
+            if daily_stats_reset == 0:
+                log(reset_daily_stats())
+                daily_stats_reset = 1
+            else:
+                daily_stats_reset = 0
+
+        time.sleep(updateFrequency)
+
+finally:
+    with open("sync","w") as f:
+        pass  # delete sync if exception occurred
