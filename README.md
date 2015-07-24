@@ -9,15 +9,12 @@ How to use the bot:
 - run the application
 
 The bot has the following features:
-- Can give a random BUG mafia quote - from bug_mafia.txt
-- tracks chat and time statistics per user - saves them in stats.txt
+- Can give a random quote from the configured quotes file
+- tracks chat and time statistics per user alltime and daily - alltime stats are saved in stats.txt
 - creates a session log in - log.txt
 - can remember/forget/recall different phrases
+- can get a picture from a specified subreddit
+- on the fly meme generator
 - all commands can be seen using /help
 
-TODO:
-- implement imgur API and applications
-
-
 Created by Adrian Suciu
-adisuciu88@yahoo.com
