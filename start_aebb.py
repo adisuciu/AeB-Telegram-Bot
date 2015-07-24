@@ -1,18 +1,18 @@
-import logging
-import socket
+
+import time
+import settings
 import os
-import sys
 
+with open("sync") as f:
+    t = f.read()
+sync = int(t)
+now = time.time()
+if (now - sync) >= settings.stats_save_freq*2:
+    os.chdir("AeB-Telegram-Bot")
+    os.system("python3 aebb.py")
+    with open("sync",'w') as f:
+        f.write(int(time.time()))
+else:
+    # nothing to do, app is already running
+    print("App is already running")
 
-lock_socket = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
-try:
-    lock_id = "adisuciu88.aebb"   # this should be unique. using your username as a prefix is a convention
-    lock_socket.bind('\0' + lock_id)
-    logging.debug("Acquired lock %r" % (lock_id,))
-except socket.error:
-    # socket already locked, task must already be running
-    logging.info("Failed to acquire lock %r" % (lock_id,))
-    sys.exit()
-
-os.chdir("AeB-Telegram-Bot")
-os.system("python3 aebb.py")

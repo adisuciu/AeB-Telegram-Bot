@@ -661,11 +661,14 @@ while not shutdown:
     else:
         log("JSON 'ok' field false ")
 
-    if save_stats_cnt < 300:  # every 5 minutes
+    if save_stats_cnt < settings.stats_save_freq:  # every 5 minutes
         save_stats_cnt += 1
     else:
         save_stats_cnt = 0
         save_stats()
+
+        with open('sync','w') as f: # for sync with other process
+            f.write(int(time.time()))
 
     # reset daily stats @03:00 am
     if datetime.datetime.now().hour == 3 and datetime.datetime.now().minute == 0:
