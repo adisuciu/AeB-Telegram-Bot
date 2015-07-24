@@ -18,4 +18,3 @@ The bot has the following features:
 - all commands can be seen using /help
 
 Created by Adrian Suciu
-adisuciu88@yahoo.com
