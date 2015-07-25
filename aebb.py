@@ -500,11 +500,12 @@ def build_meme_gen(request):
     else:  # request in meme dictionary
         retval = "http://apimeme.com/meme?meme=%s&top=%s&bottom=%s" % (meme.Dict[request[1]], toptext, bottomtext)
 
-        data = urllib.parse.urlencode({'image': retval})
-        binary_data = data.encode('ASCII')
-        req = urllib.request.Request("https://api.imgur.com/3/upload", data=binary_data,
-                                     headers=imgur_api.build_header())
-        send_http_query(req)
+        if imgur_api.logged_in():
+            data = urllib.parse.urlencode({'image': retval})
+            binary_data = data.encode('ASCII')
+            req = urllib.request.Request("https://api.imgur.com/3/upload", data=binary_data,
+                                         headers=imgur_api.build_header())
+            send_http_query(req)
 
     with open("meme_history", "a") as file:
         dt = datetime.datetime.now()
