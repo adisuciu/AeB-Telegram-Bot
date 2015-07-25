@@ -21,6 +21,8 @@ from PIL import ImageFont
 from PIL import Image
 from PIL import ImageDraw
 
+import imgur_api
+
 # TODO:
 # - google image search (to replace imgbot)
 
@@ -181,7 +183,8 @@ def build_help(request=0):
            "/search [phrase] - search all names that begin with [phrase]. [phrase] can be empty - lists all names \n"\
            "/getpic [subreddit] - gets a random picture from the subreddit. The picture is taken from today's top 60\n"\
            "/memegen <meme> '<top>' '<bottom>' - on the fly meme generator\n"\
-           "/search_meme [phrase] - search all the available memes that begin with phrase\n"
+           "/search_meme [phrase] - search all the available memes that begin with phrase\n"\
+           "/imgur_status - returns the login status of the imgur account\n"
 
 
 def build_quote(request):
@@ -358,7 +361,8 @@ def build_imgur_pic(request):
     if type(request) == list and len(request) == 2:
 
         req = urllib.request.Request("https://api.imgur.com/3/gallery/r/" + request[1] + "/top/week",
-                                     headers={"Authorization": ("Client-ID " + settings.imgur_api_client_id)})
+                                     headers=imgur_api.build_header())
+        log("logged in as %s" % imgur_api.get_bot_username())
         response = send_http_query(req)  # urllib.request.urlopen(req).read()
         if response_query:
             json_data = json.loads(response.decode('utf-8'))
@@ -452,7 +456,8 @@ def build_meme_from_link(request):
     binary_data = data.encode('ASCII')
     log("Upload start")
     req = urllib.request.Request("https://api.imgur.com/3/upload", data=binary_data,
-                                 headers={"Authorization": ("Client-ID " + settings.imgur_api_client_id)})
+                                 headers=imgur_api.build_header())
+    log("logged in as %s" % imgur_api.get_bot_username())
     response = send_http_query(req)
     if response:
         log("Upload finish")
@@ -510,6 +515,37 @@ def build_search_memes(request):
         return string
     else:
         return "Wrong number of parameters. Usage /search_meme [phrase]"
+
+
+def login_imgur(request):
+    if len(request) == 1:
+        return "Go to the following website: \n"\
+               "https://api.imgur.com/oauth2/authorize?client_id=%s&response_type=pin\n"\
+               "use command /login_imgur <pin>" % imgur_api.client_id
+    elif len(request) == 2:
+        result = imgur_api.get_token_from_pin(request[1])
+        if result:
+            return "Logged in as: " + imgur_api.get_bot_username()
+        else:
+            return "Login failed. Imgur API might be down, or wrong pin code provided. Please try again"
+
+    else:
+        return "Wrong number of parameters. Usage /login_imgur"
+
+
+# noinspection PyUnusedLocal
+def login_status_imgur(request):
+    if imgur_api.get_token():
+        return "Logged in as: " + imgur_api.get_bot_username() + "\n" + \
+               "Full gallery can be viewed at: " + imgur_api.get_bot_imgur_profile()
+    else:
+        return "Not logged in"
+
+
+# noinspection PyUnusedLocal
+def logout_imgur(request):
+    imgur_api.logout()
+    return "The bot has successfully logged out of Imgur"
 
 
 def process(update):
@@ -576,6 +612,9 @@ def process(update):
             "getpic": build_imgur_pic,
             "memegen": build_meme_gen,
             "search_meme": build_search_memes,
+            "login_imgur": login_imgur,
+            "logout_imgur": logout_imgur,
+            "imgur_status": login_status_imgur
         }
         log("Request - " + str(request))
         response = switcher[request[0]](request) if request[0] in switcher else False
@@ -634,9 +673,9 @@ shutdown = False
 random.seed()  # init random number generator
 init_stats()
 load_links_file()
+imgur_api.init()
 log("bot initialization successful")
 log("bot is now listening")
-
 try:
     while not shutdown:
         # getUpdates from server
