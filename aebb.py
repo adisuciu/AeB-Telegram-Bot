@@ -452,7 +452,10 @@ def build_meme_from_link(request):
     img.save(settings.image_temp_file, quality=50)
     log("Text added to the image")
     with open(settings.image_temp_file, "rb") as file:
-        data = urllib.parse.urlencode({'image': b64encode(file.read())})
+        params = {'image': b64encode(file.read())}
+        if album_id:
+            params['album_id'] = album_id
+        data = urllib.parse.urlencode(params)
     binary_data = data.encode('ASCII')
     log("Upload start")
     req = urllib.request.Request("https://api.imgur.com/3/upload", data=binary_data,
@@ -501,7 +504,10 @@ def build_meme_gen(request):
         retval = "http://apimeme.com/meme?meme=%s&top=%s&bottom=%s" % (meme.Dict[request[1]], toptext, bottomtext)
 
         if imgur_api.logged_in():
-            data = urllib.parse.urlencode({'image': retval})
+            params = {'image': retval}
+            if album_id:
+                params['album_id'] = album_id
+            data = urllib.parse.urlencode(params)
             binary_data = data.encode('ASCII')
             req = urllib.request.Request("https://api.imgur.com/3/upload", data=binary_data,
                                          headers=imgur_api.build_header())
@@ -532,6 +538,7 @@ def login_imgur(request):
     elif len(request) == 2:
         result = imgur_api.get_token_from_pin(request[1])
         if result:
+            album_init()
             return "Logged in as: " + imgur_api.get_bot_username()
         else:
             return "Login failed. Imgur API might be down, or wrong pin code provided. Please try again"
@@ -552,7 +559,42 @@ def login_status_imgur(request):
 # noinspection PyUnusedLocal
 def logout_imgur(request):
     imgur_api.logout()
+    global album_id
+    album_id = 0
     return "The bot has successfully logged out of Imgur"
+
+
+def album_init():
+    if imgur_api.logged_in():
+        try:
+            with open("album") as f:
+                global album_id
+                content = f.read().splitlines()
+                if content[0] == str(datetime.date.today()):
+                    album_id = content[1]
+                else:
+                    create_today_album()
+        except FileNotFoundError:
+            create_today_album()
+
+
+def create_today_album():
+    if imgur_api.logged_in():
+        global album_id
+        album_id = create_album(str(datetime.date.today()))
+        with open("album", 'w') as f:
+            f.write(str(datetime.date.today()) + "\n" + album_id)
+
+
+def create_album(albumname):
+    data = urllib.parse.urlencode({'title': albumname, "layout": "grid"})
+    binary_data = data.encode('ASCII')
+    req = urllib.request.Request("https://api.imgur.com/3/album", data=binary_data,
+                                 headers=imgur_api.build_header())
+    log("logged in as %s" % imgur_api.get_bot_username())
+    response = send_http_query(req)
+    json_data = json.loads(response.decode('utf-8'))
+    return json_data['data']['id']
 
 
 def process(update):
@@ -681,6 +723,7 @@ random.seed()  # init random number generator
 init_stats()
 load_links_file()
 imgur_api.init()
+album_init()
 log("bot initialization successful")
 log("bot is now listening")
 try:
@@ -722,6 +765,11 @@ try:
             if daily_stats_reset == 0:
                 log(reset_daily_stats())
                 daily_stats_reset = 1
+                if imgur_api.logged_in():
+                    album_id = create_album(str(datetime.date.today()))
+                    with open("album", 'w') as f:
+                        f.write(album_id)
+
             else:
                 daily_stats_reset = 0
 
