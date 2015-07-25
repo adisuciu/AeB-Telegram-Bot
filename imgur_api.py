@@ -106,7 +106,7 @@ def get_bot_username():
 
 
 def get_bot_imgur_profile():
-    return current_token['account_username'] + ".imgur.com/all" if current_token else "not logged in"
+    return current_token['account_username'] + ".imgur.com" if current_token else "not logged in"
 
 
 def init():
