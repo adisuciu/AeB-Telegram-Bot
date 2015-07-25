@@ -765,10 +765,7 @@ try:
             if daily_stats_reset == 0:
                 log(reset_daily_stats())
                 daily_stats_reset = 1
-                if imgur_api.logged_in():
-                    album_id = create_album(str(datetime.date.today()))
-                    with open("album", 'w') as f:
-                        f.write(album_id)
+                album_init() # create new album for today
 
             else:
                 daily_stats_reset = 0
