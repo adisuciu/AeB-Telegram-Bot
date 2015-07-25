@@ -84,4 +84,9 @@ Dict = {"10guy": "10+Guy",
         "confessionkid": "confession+kid",
         "lazycollegesenior": "Lazy+College+Senior",
         "matrixmorpheus": "Matrix+Morpheus",
-        "toodamnhigh": "Too+Damn+High"}
+        "toodamnhigh": "Too+Damn+High",
+        "darthvader": "star-wars-vader-force-choke",
+        "ghettojesus": "Ghetto+Jesus",
+        "facepalm2":"Frustrated+Boromir",
+
+}
