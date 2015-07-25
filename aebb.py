@@ -30,6 +30,7 @@ start_time = time.time()
 with open(settings.log_file, mode='w') as f:  # delete previous file
     pass
 
+
 def get_uptime():
     sec = datetime.timedelta(seconds=int((time.time() - start_time)))
     d = datetime.datetime(1, 1, 1) + sec
@@ -380,7 +381,7 @@ def build_imgur_pic(request):
         return "Wrong number of parameters. Usage /getpic [subreddit]"
 
 
-def DrawOutlinedText(image, coords, text, font, outline="black", fill="white"):
+def draw_outlined_text(image, coords, text, font, outline="black", fill="white"):
     if type(coords) != tuple:
         raise ValueError("coords not tuple")
     x = coords[0]
@@ -394,6 +395,7 @@ def DrawOutlinedText(image, coords, text, font, outline="black", fill="white"):
 
 def build_meme_from_link(request):
 
+    dt = datetime.datetime.now()
     toptext = request[2] if len(request) == 4 else ""
     bottomtext = request[3] if len(request) == 4 else ""
 
@@ -426,6 +428,9 @@ def build_meme_from_link(request):
     textwidth = width - 100
 
     # search appropriate font size
+    font = ImageFont.truetype(settings.font_location, 10)
+    toptextsize = 0
+
     for i in range(100):
         font = ImageFont.truetype(settings.font_location, i)
         toptextsize = font.getsize(toptext)[0]
@@ -433,10 +438,11 @@ def build_meme_from_link(request):
             break
 
     # draw top text
-    DrawOutlinedText(draw, ((width - toptextsize) / 2, 5), toptext, font=font, outline=shadowcolor, fill=fillcolor)
+    draw_outlined_text(draw, ((width - toptextsize) / 2, 5), toptext, font=font, outline=shadowcolor, fill=fillcolor)
 
     # search appropriate font size
     bottextsize = 0
+    bottextheight = 0
     for i in range(100):
         font = ImageFont.truetype(settings.font_location, i)
         bottextsize = font.getsize(bottomtext)[0]
@@ -446,8 +452,8 @@ def build_meme_from_link(request):
             break
 
     # draw bottom text
-    DrawOutlinedText(draw, ((width - bottextsize) / 2, height - bottextheight - 10), bottomtext,
-                     font=font, outline=shadowcolor, fill=fillcolor)
+    draw_outlined_text(draw, ((width - bottextsize) / 2, height - bottextheight - 10), bottomtext,
+                       font=font, outline=shadowcolor, fill=fillcolor)
 
     img.save(settings.image_temp_file, quality=50)
     log("Text added to the image")
@@ -455,6 +461,7 @@ def build_meme_from_link(request):
         params = {'image': b64encode(file.read())}
         if album_id:
             params['album_id'] = album_id
+        params['description'] = "[%02d:%02d:%02d] <%s>" % (dt.hour, dt.minute, dt.second, requester)
         data = urllib.parse.urlencode(params)
     binary_data = data.encode('ASCII')
     log("Upload start")
@@ -480,7 +487,7 @@ def build_meme_gen(request):
     else:
         toptext = urllib.parse.quote_plus(request[2])
         bottomtext = urllib.parse.quote_plus(request[3])
-
+    dt = datetime.datetime.now()
     if request[1] not in meme.Dict:
         if(request[1]) not in Links:
             pass
@@ -507,6 +514,7 @@ def build_meme_gen(request):
             params = {'image': retval}
             if album_id:
                 params['album_id'] = album_id
+            params['description'] = "[%02d:%02d:%02d] <%s>" % (dt.hour, dt.minute, dt.second, requester)
             data = urllib.parse.urlencode(params)
             binary_data = data.encode('ASCII')
             req = urllib.request.Request("https://api.imgur.com/3/upload", data=binary_data,
@@ -514,7 +522,7 @@ def build_meme_gen(request):
             send_http_query(req)
 
     with open("meme_history", "a") as file:
-        dt = datetime.datetime.now()
+
         file.write("[%d-%02d-%02d-%02d:%02d:%02d] <%s> %s\n" % (dt.year, dt.month, dt.day, dt.hour, dt.minute,
                                                                 dt.second, requester, retval))
     return retval
@@ -550,6 +558,8 @@ def login_imgur(request):
 # noinspection PyUnusedLocal
 def login_status_imgur(request):
     if imgur_api.get_token():
+        global nsfw_tag
+        nsfw_tag = True
         return "Logged in as: " + imgur_api.get_bot_username() + "\n" + \
                "Full gallery can be viewed at: " + imgur_api.get_bot_imgur_profile()
     else:
@@ -567,9 +577,9 @@ def logout_imgur(request):
 def album_init():
     if imgur_api.logged_in():
         try:
-            with open("album") as f:
+            with open("album") as file:
                 global album_id
-                content = f.read().splitlines()
+                content = file.read().splitlines()
                 if content[0] == str(datetime.date.today()):
                     album_id = content[1]
                 else:
@@ -582,8 +592,8 @@ def create_today_album():
     if imgur_api.logged_in():
         global album_id
         album_id = create_album(str(datetime.date.today()))
-        with open("album", 'w') as f:
-            f.write(str(datetime.date.today()) + "\n" + album_id)
+        with open("album", 'w') as file:
+            file.write(str(datetime.date.today()) + "\n" + album_id)
 
 
 def create_album(albumname):
